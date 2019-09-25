@@ -1,0 +1,5 @@
+//Introdução à inserção do módulo no kernel
+http://derekmolloy.ie/writing-a-linux-kernel-module-part-1-introduction/
+
+//Criando um dispositivo de caractere
+http://derekmolloy.ie/writing-a-linux-kernel-module-part-2-a-character-device
