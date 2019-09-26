@@ -1,0 +1,8 @@
+Preparação do Sistema:
+
+apt-get update
+apt-cache search linux-headers-$(uname -r)
+sudo apt-get install kmod (nome do header do kernel)
+
+mkdir -p ~/develop/kernel/teste
+cd ~/develop/kernel/teste
