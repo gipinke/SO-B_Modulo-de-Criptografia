@@ -3,3 +3,6 @@ http://derekmolloy.ie/writing-a-linux-kernel-module-part-1-introduction/
 
 //Criando um dispositivo de caractere
 http://derekmolloy.ie/writing-a-linux-kernel-module-part-2-a-character-device
+
+//Exemplo do modulo de Criptografia
+http://www.logix.cz/michal/devel/cryptodev/cryptoapi-demo.c.xp
