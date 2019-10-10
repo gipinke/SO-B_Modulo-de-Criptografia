@@ -1,3 +1,8 @@
+/* 
+ * Simple demo explaining usage of the Linux kernel CryptoAPI.
+ * By Michal Ludvig <michal@logix.cz>
+ *    http://www.logix.cz/michal/
+ */
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -117,7 +122,6 @@ static int __init
 init_cryptoapi_demo(void)
 {
         test_skcipher();
-
         return 0;
 }
 
