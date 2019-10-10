@@ -1,140 +1,122 @@
-/* 
- * Simple demo explaining usage of the Linux kernel CryptoAPI.
- * By Michal Ludvig <michal@logix.cz>
- *    http://www.logix.cz/michal/
- */
-
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/crypto.h>
 #include <linux/mm.h>
-#include <asm/scatterlist.h>
+#include <linux/scatterlist.h>
+#include <crypto/skcipher.h>
+#include <linux/random.h>
 
-#define PFX "cryptoapi-demo: "
-
-MODULE_AUTHOR("Michal Ludvig <michal@logix.cz>");
-MODULE_DESCRIPTION("Simple CryptoAPI demo");
 MODULE_LICENSE("GPL");
 
-/* ====== CryptoAPI ====== */
+/* tie all data structures together */
+struct skcipher_def {
+    struct scatterlist sg;
+    struct crypto_skcipher *tfm;
+    struct skcipher_request *req;
+    struct crypto_wait wait;
+};
 
-#define DATA_SIZE       16
-
-//Função para preencher o scatterlist
-#define FILL_SG(sg,ptr,len)     do { (sg)->page = virt_to_page(ptr); (sg)->offset = offset_in_page(ptr); (sg)->length = len; } while (0)
-
-static void
-hexdump(unsigned char *buf, unsigned int len)
+/* Perform cipher operation */
+static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
+                     int enc)
 {
-        while (len--)
-                printk("%02x", *buf++);
+    int rc;
 
-        printk("\n");
+    if (enc)
+        rc = crypto_wait_req(crypto_skcipher_encrypt(sk->req), &sk->wait);
+    else
+        rc = crypto_wait_req(crypto_skcipher_decrypt(sk->req), &sk->wait);
+
+    if (rc)
+            pr_info("skcipher encrypt returned with result %d\n", rc);
+
+    return rc;
 }
 
-static void
-cryptoapi_demo(void)
+/* Initialize and trigger cipher operation */
+static int test_skcipher(void)
 {
-        /* config options */
-        char *algo = "aes";
-        int mode = CRYPTO_TFM_MODE_CBC;
-        char key[16], iv[16]; //Chave e valor inicial
+    struct skcipher_def sk;
+    struct crypto_skcipher *skcipher = NULL;
+    struct skcipher_request *req = NULL;
+    char *scratchpad = NULL;
+    char *ivdata = NULL;
+    unsigned char key[32];
+    int ret = -EFAULT;
 
-        /* local variables */
-        struct crypto_tfm *tfm; //Transformador
-        struct scatterlist sg[8];
-        int ret;
-        char *input, *encrypted, *decrypted;
+    skcipher = crypto_alloc_skcipher("cbc-aes-aesni", 0, 0);
+    if (IS_ERR(skcipher)) {
+        pr_info("could not allocate skcipher handle\n");
+        return PTR_ERR(skcipher);
+    }
 
-        memset(key, 0, sizeof(key)); //Setar um valor no vetor
-        memset(iv, 0, sizeof(iv));
+    req = skcipher_request_alloc(skcipher, GFP_KERNEL);
+    if (!req) {
+        pr_info("could not allocate skcipher request\n");
+        ret = -ENOMEM;
+        goto out;
+    }
 
-        tfm = crypto_alloc_tfm (algo, mode); //Alocar o transformador
+    skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+                      crypto_req_done,
+                      &sk.wait);
 
-        if (tfm == NULL) {
-                printk("failed to load transform for %s %s\n", algo, mode == CRYPTO_TFM_MODE_CBC ? "CBC" : "");
-                return;
-        }
+    /* AES 256 with random key */
+    get_random_bytes(&key, 32);
+    if (crypto_skcipher_setkey(skcipher, key, 32)) {
+        pr_info("key could not be set\n");
+        ret = -EAGAIN;
+        goto out;
+    }
 
-        ret = crypto_cipher_setkey(tfm, key, sizeof(key)); //Setar a chave no transformador
+    /* IV will be random */
+    ivdata = kmalloc(16, GFP_KERNEL);
+    if (!ivdata) {
+        pr_info("could not allocate ivdata\n");
+        goto out;
+    }
+    get_random_bytes(ivdata, 16);
 
-        if (ret) {
-                printk(KERN_ERR PFX "setkey() failed flags=%x\n", tfm->crt_flags);
-                goto out;
-        }
+    /* Input data will be random */
+    scratchpad = kmalloc(16, GFP_KERNEL);
+    if (!scratchpad) {
+        pr_info("could not allocate scratchpad\n");
+        goto out;
+    }
+    get_random_bytes(scratchpad, 16);
 
-        //Alocar espaço para a variavel input, de forma que o processo entra em espera caso não tenha espaço para alocar.
-        input = kmalloc(GFP_KERNEL, DATA_SIZE);
-        if (!input) {
-                printk(KERN_ERR PFX "kmalloc(input) failed\n");
-                goto out;
-        }
+    sk.tfm = skcipher;
+    sk.req = req;
 
-        encrypted = kmalloc(GFP_KERNEL, DATA_SIZE);
-        if (!encrypted) {
-                printk(KERN_ERR PFX "kmalloc(encrypted) failed\n");
-                kfree(input);
-                goto out;
-        }
+    /* We encrypt one block */
+    sg_init_one(&sk.sg, scratchpad, 16);
+    skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
+    crypto_init_wait(&sk.wait);
 
-        decrypted = kmalloc(GFP_KERNEL, DATA_SIZE);
-        if (!decrypted) {
-                printk(KERN_ERR PFX "kmalloc(decrypted) failed\n");
-                kfree(encrypted);
-                kfree(input);
-                goto out;
-        }
+    /* encrypt data */
+    ret = test_skcipher_encdec(&sk, 1);
+    if (ret)
+        goto out;
 
-        memset(input, 0, DATA_SIZE);
-
-        //Prencher a scatterlist com as variaveis input, encrypted e decrypted
-        FILL_SG(&sg[0], input, DATA_SIZE);
-        FILL_SG(&sg[1], encrypted, DATA_SIZE);
-        FILL_SG(&sg[2], decrypted, DATA_SIZE);
-
-        //Setar valor inicial do transformador
-        crypto_cipher_set_iv(tfm, iv, crypto_tfm_alg_ivsize (tfm));
-        
-        //Criptografar o valor de input (Essa função não esta mais disponível para uso: procurar outra função)
-        ret = crypto_cipher_encrypt(tfm, &sg[1], &sg[0], DATA_SIZE);
-        if (ret) {
-                printk(KERN_ERR PFX "encryption failed, flags=0x%x\n", tfm->crt_flags);
-                goto out_kfree;
-        }
-
-        crypto_cipher_set_iv(tfm, iv, crypto_tfm_alg_ivsize (tfm));
-        //Descriptografar o valor criptografado (Essa função não esta mais disponível para uso: procurar outra função)
-        ret = crypto_cipher_decrypt(tfm, &sg[2], &sg[1], DATA_SIZE);
-        if (ret) {
-                printk(KERN_ERR PFX "decryption failed, flags=0x%x\n", tfm->crt_flags);
-                goto out_kfree;
-        }
-
-        printk(KERN_ERR PFX "IN: "); hexdump(input, DATA_SIZE);
-        printk(KERN_ERR PFX "EN: "); hexdump(encrypted, DATA_SIZE);
-        printk(KERN_ERR PFX "DE: "); hexdump(decrypted, DATA_SIZE);
-
-        if (memcmp(input, decrypted, DATA_SIZE) != 0)
-                printk(KERN_ERR PFX "FAIL: input buffer != decrypted buffer\n");
-        else
-                printk(KERN_ERR PFX "PASS: encryption/decryption verified\n");
-
-out_kfree:
-        kfree(decrypted);
-        kfree(encrypted);
-        kfree(input);
+    pr_info("Encryption triggered successfully\n");
 
 out:
-        crypto_free_tfm(tfm);
+    if (skcipher)
+        crypto_free_skcipher(skcipher);
+    if (req)
+        skcipher_request_free(req);
+    if (ivdata)
+        kfree(ivdata);
+    if (scratchpad)
+        kfree(scratchpad);
+    return ret;
 }
-
-/* ====== Module init/exit ====== */
 
 static int __init
 init_cryptoapi_demo(void)
 {
-        cryptoapi_demo();
+        test_skcipher();
 
         return 0;
 }
@@ -142,6 +124,7 @@ init_cryptoapi_demo(void)
 static void __exit
 exit_cryptoapi_demo(void)
 {
+	printk(KERN_INFO "teste.c - Teste siando...");
 }
 
 module_init(init_cryptoapi_demo);
