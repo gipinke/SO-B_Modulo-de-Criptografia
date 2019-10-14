@@ -41,9 +41,9 @@ static char *scratchpad = NULL;
 static char *ivdata = NULL;
 static char *keydata = NULL;
 
-module_param(keydata, char*, S_IRUGO);
+module_param(keydata, charp, 0000);
 MODULE_PARM_DESC(keydata, "Chave para criptografia");
-module_param(ivdata, char*, S_IRUGO);
+module_param(ivdata, charp, 0000);
 MODULE_PARM_DESC(ivdata, "Vetor de inicialização da criptografia");
  
 // The prototype functions for the character driver -- must come before the struct definition
@@ -242,11 +242,25 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
  *  @param len The length of the array of data that is being passed in the const char buffer
  *  @param offset The offset if required
  */
+static void split_operation(const char *buffer, char *operation, char *data, int len){
+	*operation = buffer[0];
+	
+	int i;
+
+	for(i = 2; i < len; i++){
+		data[i-2] = buffer[i];
+	}
+	data[i] = '\0';
+
+}
+
 static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
 {
+   char op, data[256];	
    sprintf(message, "%s(%zu letters)", buffer, len);   // appending received string with its length
    size_of_message = strlen(message);                 // store the length of the stored message
-   printk(KERN_INFO "EBBChar: Received %zu characters from the user\n", len);
+   split_operation(buffer, &op, data, size_of_message);
+   printk(KERN_INFO "EBBChar: op: %c, data: %s\n", op, data);
    return len;
 }
  
