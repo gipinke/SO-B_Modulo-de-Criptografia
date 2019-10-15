@@ -103,7 +103,7 @@ static int crypto_init(void){
         goto out;
 	}
 
-   if (crypto_skcipher_setkey(skcipher, key, 32)) {
+   if (crypto_skcipher_setkey(skcipher, keydata, 32)) {
         pr_info("key could not be set\n");
         ret = -EAGAIN;
         goto out;
@@ -115,7 +115,7 @@ static int crypto_init(void){
         pr_info("could not allocate ivdata\n");
         goto out;
     }
-    get_random_bytes(ivdata, 16);
+    //get_random_bytes(ivdata, 16);
 
     /* Input data will be random */
     scratchpad = kmalloc(16, GFP_KERNEL);
