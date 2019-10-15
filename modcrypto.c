@@ -41,9 +41,9 @@ static char *scratchpad = NULL;
 static char *ivdata = NULL;
 static char *keydata = NULL;
 
-module_param(keydata, char*, S_IRUGO);
+module_param(keydata, charp, 0000);
 MODULE_PARM_DESC(keydata, "Chave para criptografia");
-module_param(ivdata, char*, S_IRUGO);
+module_param(ivdata, charp, 0000);
 MODULE_PARM_DESC(ivdata, "Vetor de inicialização da criptografia");
  
 // The prototype functions for the character driver -- must come before the struct definition
@@ -103,8 +103,14 @@ static int crypto_init(void){
         goto out;
 	}
 
-/* IV will be random */
-    ivdata = kmalloc(16, GFP_KERNEL);
+   if (crypto_skcipher_setkey(skcipher, key, 32)) {
+        pr_info("key could not be set\n");
+        ret = -EAGAIN;
+        goto out;
+    }
+
+   /* IV will be random */
+    //ivdata = kmalloc(16, GFP_KERNEL);
     if (!ivdata) {
         pr_info("could not allocate ivdata\n");
         goto out;
@@ -202,7 +208,7 @@ static int dev_open(struct inode *inodep, struct file *filep)
    {					// return 1 if sucessful and 0 if there is contention
       printk(KERN_ALERT "EBBChar: Device in use by another process");
       return -EBUSY;
-   }  
+   }
    numberOpens++;
    printk(KERN_INFO "EBBChar: Device has been opened %d time(s)\n", numberOpens);
    return 0;
@@ -234,6 +240,19 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
    }
 }
  
+
+static void split_operation(const char *buffer, char *operation, char *data, int len){
+	*operation = buffer[0];
+	
+	int i;
+
+	for(i = 2; i < len; i++){
+		data[i-2] = buffer[i];
+	}
+	data[i] = '\0';
+
+}
+
 /** @brief This function is called whenever the device is being written to from user space i.e.
  *  data is sent to the device from the user. The data is copied to the message[] array in this
  *  LKM using the sprintf() function along with the length of the string.
@@ -242,12 +261,31 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
  *  @param len The length of the array of data that is being passed in the const char buffer
  *  @param offset The offset if required
  */
-static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
+static int dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
 {
+   char op, data[256];	
+
    sprintf(message, "%s(%zu letters)", buffer, len);   // appending received string with its length
    size_of_message = strlen(message);                 // store the length of the stored message
-   printk(KERN_INFO "EBBChar: Received %zu characters from the user\n", len);
-   return len;
+   split_operation(buffer, &op, data, size_of_message);
+
+   switch(op){
+      case 'c': //Cripografia
+
+      break;
+      case 'd': //Descriptografia
+
+      break;
+      case 'h': //Resumo Criptográfico -- Não entendi direito
+
+      break;
+      default: //Erro - nenhuma das opções possíveis
+         return 0;
+      break;
+   }
+
+   printk(KERN_INFO "EBBChar: op: %c, data: %s\n", op, data);
+   return 1;
 }
  
 /** @brief The device release function that is called whenever the device is closed/released by
