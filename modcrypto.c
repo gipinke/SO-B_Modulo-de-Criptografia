@@ -103,13 +103,19 @@ static int crypto_init(void){
         goto out;
 	}
 
-/* IV will be random */
-    ivdata = kmalloc(16, GFP_KERNEL);
+   if (crypto_skcipher_setkey(skcipher, keydata, 32)) {
+        pr_info("key could not be set\n");
+        ret = -EAGAIN;
+        goto out;
+    }
+
+   /* IV will be random */
+    //ivdata = kmalloc(16, GFP_KERNEL);
     if (!ivdata) {
         pr_info("could not allocate ivdata\n");
         goto out;
     }
-    get_random_bytes(ivdata, 16);
+    //get_random_bytes(ivdata, 16);
 
     /* Input data will be random */
     scratchpad = kmalloc(16, GFP_KERNEL);
@@ -202,7 +208,7 @@ static int dev_open(struct inode *inodep, struct file *filep)
    {					// return 1 if sucessful and 0 if there is contention
       printk(KERN_ALERT "EBBChar: Device in use by another process");
       return -EBUSY;
-   }  
+   }
    numberOpens++;
    printk(KERN_INFO "EBBChar: Device has been opened %d time(s)\n", numberOpens);
    return 0;
@@ -234,14 +240,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
    }
 }
  
-/** @brief This function is called whenever the device is being written to from user space i.e.
- *  data is sent to the device from the user. The data is copied to the message[] array in this
- *  LKM using the sprintf() function along with the length of the string.
- *  @param filep A pointer to a file object
- *  @param buffer The buffer to that contains the string to write to the device
- *  @param len The length of the array of data that is being passed in the const char buffer
- *  @param offset The offset if required
- */
+
 static void split_operation(const char *buffer, char *operation, char *data, int len){
 	*operation = buffer[0];
 	
@@ -254,14 +253,49 @@ static void split_operation(const char *buffer, char *operation, char *data, int
 
 }
 
+/** @brief This function is called whenever the device is being written to from user space i.e.
+ *  data is sent to the device from the user. The data is copied to the message[] array in this
+ *  LKM using the sprintf() function along with the length of the string.
+ *  @param filep A pointer to a file object
+ *  @param buffer The buffer to that contains the string to write to the device
+ *  @param len The length of the array of data that is being passed in the const char buffer
+ *  @param offset The offset if required
+ */
 static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
 {
    char op, data[256];	
+   int ret;
+
    sprintf(message, "%s(%zu letters)", buffer, len);   // appending received string with its length
    size_of_message = strlen(message);                 // store the length of the stored message
    split_operation(buffer, &op, data, size_of_message);
+
+printk(KERN_INFO "EBBChar: op: %c, data: %s\n", op, data);
+
+	sg_init_one(&sk.sg, data, size_of_message);
+    	skcipher_request_set_crypt(req, &sk.sg, &sk.sg, size_of_message, ivdata);
+    	crypto_init_wait(&sk.wait);
+
+
+   switch(op){
+      case 'c': //Cripografia
+	ret = crypto_wait_req(crypto_skcipher_encrypt((&sk)->req), &(&sk)->wait);
+	pr_info("EBBChar: ret: %d\n", ret);
+      break;
+
+      case 'd': //Descriptografia
+
+      break;
+      case 'h': //Resumo Criptográfico -- Não entendi direito
+
+      break;
+      default: //Erro - nenhuma das opções possíveis
+         return 0;
+      break;
+   }
+
    printk(KERN_INFO "EBBChar: op: %c, data: %s\n", op, data);
-   return len;
+   return 1;
 }
  
 /** @brief The device release function that is called whenever the device is closed/released by
