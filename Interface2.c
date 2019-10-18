@@ -91,6 +91,8 @@ int main()
    char enviarString[BUFFER_LENGTH];
    char enviarStringHEX[BUFFER_LENGTH];
    char teste[BUFFER_LENGTH];
+   char teste2[BUFFER_LENGTH];
+
    fd = open("/dev/ebbchar", O_RDWR);             // Open the device with read/write access
 
    if (fd < 0)
@@ -129,7 +131,7 @@ int main()
                                 textFromHexString(enviarString, teste);
 
 
-                                printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarString, teste);
+                                printf("\nPalavra a ser Criptografada:\nHEX: %s\nASCII: %s\n\n",enviarString, teste);
                                 printf("Aperte enter para criptografar...\n");
                                 getchar();
 
@@ -141,12 +143,24 @@ int main()
                                         return errno;
                                 }
 
+                                printf("\nRecendo valor Criptografado...\n");
+                                ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
+                                if (ret < 0)
+                                {
+                                        perror("Failed to read the message from the device.");
+                                        return errno;
+                                }
+
+                                printf("\nValor Criptografado:\nHEX: [%s]\n", receive);
+                                printf("Aperte enter para continuar...\n");
+                                getchar();
+
                                 break;
                         case 2:
                                 gerarPalavra(stringToSend, enviarString);
                                 textFromHexString(enviarString, teste);
 
-                                 printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarString, teste);
+                                printf("\nPalavra a ser Criptografada:\nHEX: %s\nASCII: %s\n\n",enviarString, teste);
                                 printf("Aperte enter para descriptografar...\n");
                                 getchar();
 
@@ -158,12 +172,24 @@ int main()
                                         return errno;
                                 }
 
+                                printf("\nRecendo valor Descriptografado...\n");
+                                ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
+                                if (ret < 0)
+                                {
+                                        perror("Failed to read the message from the device.");
+                                        return errno;
+                                }
+
+                                printf("\nValor Descriptografado:\nHEX: [%s]\n", receive);
+                                printf("Aperte enter para continuar...\n");
+                                getchar();
+
                                 break;
                         case 3:
                                 gerarPalavra(stringToSend, enviarString);
                                 textFromHexString(enviarString, teste);
 
-                                 printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarString, teste);
+                                printf("\nPalavra a ter o hash caculado:\nHEX: %s\nASCII: %s\n\n",enviarString, teste);
                                 printf("Aperte enter para calcular hash...\n");
                                 getchar();
 
@@ -175,21 +201,21 @@ int main()
                                         return errno;
                                 }
 
+                                printf("\nRecendo valor do hash...\n");
+                                ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
+                                if (ret < 0)
+                                {
+                                        perror("Failed to read the message from the device.");
+                                        return errno;
+                                }
+
+                                printf("\nValor do Hash: [%s]\n", receive);
+                                printf("Aperte enter para continuar...\n");
+                                getchar();
+
+
                                 break;
                 }
-
-  		/*
-  		printf("Reading from the device...\n");
-   		ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
-   		if (ret < 0)
-		{
-   	   	        perror("Failed to read the message from the device.");
-   	   		return errno;
-   		}
-
-   	        printf("The received message is: [%s]\n", receive);
-   		printf("Aperte enter para continuar...\n");
-		getchar();*/
    	}
 
 	else if(opcao == 2)
@@ -216,35 +242,96 @@ int main()
                                 gerarPalavra(stringToSend, enviarString);
                                 string2hexString(enviarString, enviarStringHEX);
 
-                                printf("Palavra a ser Criptografada : %s %s\n",enviarString, enviarStringHEX);
+                                printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarString, enviarStringHEX);
                                 printf("Aperte enter para criptografar...\n");
                                 getchar();
+
+                                ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
+  		 
+		                if (ret < 0)
+                                {
+                                        perror("Failed to write the message to the device.");
+                                        return errno;
+                                }
+
+                                printf("\nRecendo valor Criptografado...\n");
+                                ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
+                                if (ret < 0)
+                                {
+                                        perror("Failed to read the message from the device.");
+                                        return errno;
+                                }
+
+                                textFromHexString(receive, teste2);
+
+                                printf("\nValor Criptografado:\nHEX: [%s]\nASCII: [%s]", receive, teste2);
+                                printf("Aperte enter para continuar...\n");
+                                getchar();
+
                                 break;
                         case 2:
                                 gerarPalavra(stringToSend, enviarString);
                                 string2hexString(enviarString, enviarStringHEX);
 
-                                printf("Palavra a ser Criptografada : %s %s\n",enviarString, enviarStringHEX);
+                                printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarString, enviarStringHEX);
                                 printf("Aperte enter para criptografar...\n");
                                 getchar();
+
+                                ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
+  		 
+		                if (ret < 0)
+                                {
+                                        perror("Failed to write the message to the device.");
+                                        return errno;
+                                }
+
+                                printf("\nRecendo valor Descriptografado...\n");
+                                ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
+                                if (ret < 0)
+                                {
+                                        perror("Failed to read the message from the device.");
+                                        return errno;
+                                }
+
+                                textFromHexString(receive, teste2);
+
+                                printf("\nValor Desriptografado:\nHEX: [%s]\nASCII: [%s]", receive, teste2);
+                                printf("Aperte enter para continuar...\n");
+                                getchar();
+
+
                                 break;
                         case 3:
                                 gerarPalavra(stringToSend, enviarString);
                                 string2hexString(enviarString, enviarStringHEX);
 
-                                printf("Palavra a ser Criptografada : %s %s\n",enviarString, enviarStringHEX);
-                                printf("Aperte enter para criptografar...\n");
+                                printf("\nPalavra a ter o hash caculado:\nHEX: %s\nASCII: %s\n\n",enviarString, enviarStringHEX);
+                                printf("Aperte enter para calcular hash...\n");
                                 getchar();
+
+                                ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
+  		 
+		                if (ret < 0)
+                                {
+                                        perror("Failed to write the message to the device.");
+                                        return errno;
+                                }
+
+                                printf("\nRecendo valor do hash...\n");
+                                ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
+                                if (ret < 0)
+                                {
+                                        perror("Failed to read the message from the device.");
+                                        return errno;
+                                }
+
+                                printf("\nValor do Hash: [%s]\n", receive);
+                                printf("Aperte enter para continuar...\n");
+                                getchar();
+
                                 break;
                 }
-                /*printf("Writing message to the device [%s].\n", stringToSend);
-                ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
-                 
-                if (ret < 0)
-                {
-                        perror("Failed to write the message to the device.");
-                        return errno;                }
- 
+                /*
                 printf("Press ENTER to read back from the device...\n");
                 getchar();
  
