@@ -49,7 +49,8 @@ static int     dev_release(struct inode *, struct file *);
 static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
 
-static int modcrypto_encrypt(void);
+static int modcrypto_encrypt(char *buff, int len_buff);
+static int modcrypto_decrypt(char *buff, int len_buff);
 
 static DEFINE_MUTEX(ebbchar_mutex);  /// A macro that is used to declare a new mutex that is visible in this file
                                      /// results in a semaphore variable ebbchar_mutex with value 1 (unlocked)
@@ -66,6 +67,54 @@ static struct file_operations fops =
    .write = dev_write,
    .release = dev_release,
 };
+
+static void hexdump(unsigned char *buff, unsigned int len)
+{
+	 unsigned char *aux = buff;
+	 printk(KERN_INFO "HEXDUMP:\n");
+	 while(len--) { printk(KERN_CONT "%02x[%c] ", *aux, *aux); aux++; }
+	 printk("\n");
+}
+
+void textFromHexString(char *hex,char *result)
+{
+    char text[256] = {0};
+    int tc=0, k;
+		char temp[3];
+		long number;
+                 
+    for(k=0;k<strlen(hex);k++)
+    {
+            if(k%2!=0)
+            {
+                    sprintf(temp,"%c%c",hex[k-1],hex[k]);
+                    kstrtol(temp, 16, &number);
+                    text[tc] = (char)number;
+                    
+                    tc++;   
+            }
+    } 
+    strcpy(result,text);
+}
+
+void string2hexString(char* string, char* resultado, int len)
+{
+	 unsigned char *aux = string;
+	 int i = 0;
+	 while(len--) { sprintf(resultado+i, "%02x", *aux); aux++; i+=2; }
+	 resultado[i] = 0;
+}
+
+static void split_operation(const char *buffer, char *operation, char *data, int len){
+	int i = 0;	
+
+	*operation = buffer[0];
+
+	for(i = 2; i < len; i++){
+		data[i-2] = buffer[i];
+	}
+
+}
  
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -133,9 +182,11 @@ static int __init ebbchar_init(void){
 		 else key[i] = '0';
 
 		 if(i < ivsize) iv[i] = ivdata[i];
-		 else iv[i] = '0';
+		 else iv[i] = 0;
 
 	 }
+	 key[i] = '\0';
+	 iv[i] = '\0';
 
 	 printk(KERN_INFO "EBBChar: key: %s - iv: %s\n", key, iv);
 
@@ -211,21 +262,83 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
  */
 static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
 {
-   sprintf(message, "%s(%zu letters)", buffer, len);   // appending received string with its length
-   size_of_message = strlen(message);                 // store the length of the stored message
-   printk(KERN_INFO "EBBChar: Received %zu characters from the user\n", len);
-   return len;
+   char op, buff[256] = {0}, buff_test[256] = {0};
+	 int len_buff, ret;
+
+ 
+   len_buff = strlen(buffer);
+
+	 split_operation(buffer, &op, buff, len_buff);
+	 textFromHexString(buff, buff_test);
+	 len_buff = strlen(buff_test);
+
+		pr_info("EBBChar: ------| BUFF RESULT |------\n");
+ 		hexdump(buff_test, len_buff);
+ 		pr_info("EBBChar: ------| BUFF RESULT |------\n");
+
+	 switch(op){
+      case 'c': //Cripografia
+
+		 	ret = modcrypto_encrypt(buff_test, len_buff);
+
+			pr_info("EBBChar: Criptografia concluida - message: %s\n", message);
+
+
+			//ret = modcrypto_decrypt(message, size_of_message);
+
+			//pr_info("EBBChar: Descriptografia concluida - message: %s\n", message);
+
+      break;
+
+
+      case 'd': //Descriptografia
+
+		 	ret = modcrypto_decrypt(buff_test, len_buff);
+
+			pr_info("EBBChar: Descriptografia concluida - message: %s\n", message);
+
+      break;
+
+
+      case 'h': //Resumo Criptográfico -- Não entendi direito
+
+      break;
+
+
+      default: //Erro - nenhuma das opções possíveis
+         return 0;
+      break;
+   }
+
+   return len_buff;
 }
 
-static int modcrypto_encrypt(void)
+static int modcrypto_encrypt(char *buff, int len_buff)
 {
-	 struct skcipher_def sk;
 	 struct crypto_skcipher *skcipher = NULL;
 	 struct skcipher_request *req = NULL;
+	 char *_iv = NULL;
+	 struct scatterlist sg_scratchpad;
 	 char *scratchpad = NULL;
-	 int ret = -EFAULT;	
+	 struct scatterlist sg_encrypted;
+	 char *encrypted_buff = NULL;
+	 char *encrypteddata = NULL;
+	 int ret = -EFAULT;
 
-	 skcipher = crypto_alloc_skcipher("cbc-aes-aesni", 0, 0);
+	 int num_blocks;
+	 int len_scratchpad, len_ivdata;
+	 int i;
+
+	 len_ivdata = strlen(ivdata);
+	 _iv = kmalloc(16, GFP_KERNEL);
+	 for(i = 0; i < 16; i++){
+		 if(i < len_ivdata) _iv[i] = ivdata[i];
+		 else _iv[i] = 0;
+
+	 }
+	 _iv[i] = '\0';
+
+	 skcipher = crypto_alloc_skcipher("cbc(aes)", 0, 0);
    if (IS_ERR(skcipher)) {
 		 pr_info("could not allocate skcipher handle\n");
      return PTR_ERR(skcipher);
@@ -243,16 +356,63 @@ static int modcrypto_encrypt(void)
        ret = -EAGAIN;
        goto out;
    }
+	 
+	 if(len_buff % 16)num_blocks = 1 + (len_buff / 16);
+	 else num_blocks = len_buff / 16;
 
-	 scratchpad = kmalloc(16, GFP_KERNEL);
-   if (!scratchpad) {
+	 len_scratchpad = num_blocks * 16;
+
+	 scratchpad = kmalloc(len_scratchpad, GFP_KERNEL);
+	 encrypted_buff = kmalloc(len_scratchpad, GFP_KERNEL);
+   if (!scratchpad || !encrypted_buff) {
    	 pr_info("could not allocate scratchpad\n");
      goto out;
    }
 
-	 sk.tfm = skcipher;
-   sk.req = req;
+	 for(i = 0; i < len_scratchpad;i++){
+		 if(i < len_buff) scratchpad[i] = buff[i];
+		 else scratchpad[i] = 0;
+	 }
 
+	 pr_info("\n\nEBBChar: --| Before |--\n\n");
+	 pr_info("EBBChar: key: %s\n", key);
+	 pr_info("EBBChar: iv: %s\n", iv);
+	 pr_info("EBBChar: scratchpad: %s\n", scratchpad);
+	 pr_info("EBBChar: encrypteddata: %s", encrypteddata);
+	 pr_info("\nEBBChar: --| Before |--\n\n\n");
+
+	
+	 sg_init_one(&sg_scratchpad, scratchpad, len_scratchpad);
+	 sg_init_one(&sg_encrypted, encrypted_buff, len_scratchpad);
+
+	 skcipher_request_set_crypt(req, &sg_scratchpad, &sg_encrypted, len_scratchpad, _iv);
+
+	 ret = crypto_skcipher_encrypt(req);
+
+	 if(ret){
+		 pr_info("EBBChar: Falha na criptografia\n");
+		 goto out;
+	 }
+
+	 encrypteddata = sg_virt(&sg_encrypted);
+
+	 pr_info("EBBChar: ------| CRYPTO RESULT |------\n");
+	 hexdump(encrypteddata, len_scratchpad);
+	 pr_info("EBBChar: ------| CRYPTO RESULT |------\n");
+	 
+	 //for(i = 0; i < len_scratchpad; i++) message[i] = encrypteddata[i];
+	 //message[i] = 0;
+
+	 string2hexString(encrypteddata, message, len_scratchpad);
+
+	 size_of_message = len_scratchpad*2;
+
+	 pr_info("\n\nEBBChar: --| After |--\n\n");
+	 pr_info("EBBChar: key: %s\n", key);
+	 pr_info("EBBChar: iv: %s\n", iv);
+	 pr_info("EBBChar: scratchpad: %s\n", scratchpad);
+	 pr_info("EBBChar: encrypteddata: %s", encrypteddata);
+	 pr_info("\nEBBChar: --| After |--\n\n\n");
 
 out:
 	if (skcipher)
@@ -261,6 +421,125 @@ out:
       skcipher_request_free(req);
   if (scratchpad)
       kfree(scratchpad);
+	if (encrypted_buff)
+			kfree(encrypted_buff);
+
+	return ret;
+
+}
+
+static int modcrypto_decrypt(char *buff, int len_buff)
+{
+	 struct crypto_skcipher *skcipher = NULL;
+	 struct skcipher_request *req = NULL;
+	 char *_iv = NULL;
+	 struct scatterlist sg_scratchpad;
+	 char *scratchpad = NULL;
+	 struct scatterlist sg_decrypted;
+	 char *decrypted_buff = NULL;
+	 char *decrypteddata = NULL;
+	 int ret = -EFAULT;
+
+	 int num_blocks;
+	 int len_scratchpad, len_ivdata;
+	 int i;
+
+	 len_ivdata = strlen(ivdata);
+	 _iv = kmalloc(16, GFP_KERNEL);
+	 for(i = 0; i < 16; i++){
+		 if(i < len_ivdata) _iv[i] = ivdata[i];
+		 else _iv[i] = 0;
+
+	 }
+	 _iv[i] = '\0';
+
+	 skcipher = crypto_alloc_skcipher("cbc(aes)", 0, 0);
+   if (IS_ERR(skcipher)) {
+		 pr_info("could not allocate skcipher handle\n");
+     return PTR_ERR(skcipher);
+   }
+
+   req = skcipher_request_alloc(skcipher, GFP_KERNEL);
+   	 if (!req) {
+			 pr_info("could not allocate skcipher request\n");
+       ret = -ENOMEM;
+       goto out;
+	 }
+
+	 if (crypto_skcipher_setkey(skcipher, key, 16)) {
+       pr_info("key could not be set\n");
+       ret = -EAGAIN;
+       goto out;
+   }
+	 
+	 if(len_buff % 16)num_blocks = 1 + (len_buff / 16);
+	 else num_blocks = len_buff / 16;
+
+	 len_scratchpad = num_blocks * 16;
+
+	 scratchpad = kmalloc(len_scratchpad, GFP_KERNEL);
+	 decrypted_buff = kmalloc(len_scratchpad, GFP_KERNEL);
+   if (!scratchpad || !decrypted_buff) {
+   	 pr_info("could not allocate scratchpad\n");
+     goto out;
+   }
+
+	 for(i = 0; i < len_scratchpad;i++){
+		 if(i < len_buff) scratchpad[i] = buff[i];
+		 else scratchpad[i] = 0;
+	 }
+
+	 pr_info("\n\nEBBChar: --| Before |--\n\n");
+	 pr_info("EBBChar: key: %s\n", key);
+	 pr_info("EBBChar: iv: %s\n", iv);
+	 pr_info("EBBChar: scratchpad: %s\n", scratchpad);
+	 pr_info("EBBChar: decrypteddata: %s", decrypteddata);
+	 pr_info("\nEBBChar: --| Before |--\n\n\n");
+
+	
+	 sg_init_one(&sg_scratchpad, scratchpad, len_scratchpad);
+	 sg_init_one(&sg_decrypted, decrypted_buff, len_scratchpad);
+
+	 skcipher_request_set_crypt(req, &sg_scratchpad, &sg_decrypted, len_scratchpad, _iv);
+
+	 ret = crypto_skcipher_decrypt(req);
+
+	 if(ret){
+		 pr_info("EBBChar: Falha na descriptografia\n");
+		 goto out;
+	 }
+
+	 decrypteddata = sg_virt(&sg_decrypted);
+
+	 pr_info("EBBChar: ------| DECRYPTO RESULT |------\n");
+	 hexdump(decrypteddata, len_scratchpad);
+	 pr_info("EBBChar: ------| DECRYPTO RESULT |------\n");
+	 
+	 //for(i = 0; i < len_scratchpad; i++) message[i] = decrypteddata[i];
+	 //message[i] = 0;
+
+	 string2hexString(decrypteddata, message, len_scratchpad);
+
+	 size_of_message = len_scratchpad*2;
+
+	 pr_info("\n\nEBBChar: --| After |--\n\n");
+	 pr_info("EBBChar: key: %s\n", key);
+	 pr_info("EBBChar: iv: %s\n", iv);
+	 pr_info("EBBChar: scratchpad: %s\n", scratchpad);
+	 pr_info("EBBChar: decrypteddata: %s", decrypteddata);
+	 pr_info("\nEBBChar: --| After |--\n\n\n");
+
+out:
+	if (skcipher)
+      crypto_free_skcipher(skcipher);
+  if (req)
+      skcipher_request_free(req);
+  if (scratchpad)
+      kfree(scratchpad);
+	if (decrypted_buff)
+			kfree(decrypted_buff);
+
+	return ret;
 
 }
  
