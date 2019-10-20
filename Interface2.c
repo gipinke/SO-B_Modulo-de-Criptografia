@@ -13,7 +13,7 @@ static char receive[BUFFER_LENGTH];     ///< The receive buffer from the LKM
 //Metodo achado no stack overflow para converter hexa para string 
 void textFromHexString(char *hex,char *result)
 {
-        char text[BUFFER_LENGTH];
+        char text[BUFFER_LENGTH] = "";
         int tc=0;
                      
         for(int k=0;k<strlen(hex);k++)
@@ -82,16 +82,40 @@ void gerarPalavra(char *string, char *resultado)
         resultado[i-2] = '\0';
 }
 
+void gerarString(int funcao, char *string, char *resultado)
+{
+        strcpy(resultado, "");
+        char auxHEX[256 ],aux[256] = "";
+        if(funcao == 1)
+        {
+                aux[0] = 'c';
+        }
+        else if(funcao == 2)
+        {
+                aux[0] = 'd';
+        }
+        else if(funcao == 3)
+        {
+                aux[0] = 'h';
+        }
+        strcat(aux, " ");
+        string2hexString(string, auxHEX);
+        strcat(aux, auxHEX);
+        strcpy(resultado,aux);
+}
+
 
 int main()
 {
    int ret, fd;
    int opcao  = 0, funcao = 0;
-   char stringToSend[BUFFER_LENGTH];
-   char enviarString[BUFFER_LENGTH];
-   char enviarStringHEX[BUFFER_LENGTH];
-   char teste[BUFFER_LENGTH];
-   char teste2[BUFFER_LENGTH];
+   char stringToSend[BUFFER_LENGTH]="";
+   char stringToSend2[BUFFER_LENGTH]="";
+   char enviarString[BUFFER_LENGTH]="";
+   char enviarStringHEX[BUFFER_LENGTH]="";
+   char teste[BUFFER_LENGTH]="";
+   char teste2[BUFFER_LENGTH]="";
+   char receberStringASCII[BUFFER_LENGTH]="";
 
    fd = open("/dev/ebbchar", O_RDWR);             // Open the device with read/write access
 
@@ -102,6 +126,14 @@ int main()
    }
    do
    {
+        strcpy(stringToSend,"");
+        strcpy(stringToSend2,"");
+        strcpy(enviarString,"");
+        strcpy(enviarStringHEX,"");
+        strcpy(teste,"");
+        strcpy(teste2,"");
+        strcpy(receberStringASCII,"");
+
 	system("clear");
    	printf("Menu:\n1-Receber String em Hexa\n2-Receber String em ASCII\n3-Sair\nDigite a opção desejada:");
         scanf("%d", &opcao);
@@ -111,7 +143,7 @@ int main()
 		system("clear");
        		printf("OBS: Escreva o que deseja fazer primeiro respresentado pelas letras:\n");
 		printf("(c) para cifrar\n(d) para decifrar\n(h) para calcular o resumo criptografico\n");
-		printf("Depois disso use o espaço e começe a escrever a string onde a cada 2 numeros, um valor ASCI será representado\n");
+		printf("Depois disso use o espaço e começe a escrever a string onde a cada 2 numeros, um valor ASCII será representado\n");
  		__fpurge(stdin);
 		scanf("%[^\n]%*c", stringToSend);                // Read in a string (with spaces)
 
@@ -151,7 +183,9 @@ int main()
                                         return errno;
                                 }
 
-                                printf("\nValor Criptografado:\nHEX: [%s]\n", receive);
+                                textFromHexString(receive, receberStringASCII);
+
+                                printf("\nValor Criptografado:\nHEX: [ %s ]\nASCII: [ %s ]\n", receive, receberStringASCII);
                                 printf("Aperte enter para continuar...\n");
                                 getchar();
 
@@ -180,7 +214,9 @@ int main()
                                         return errno;
                                 }
 
-                                printf("\nValor Descriptografado:\nHEX: [%s]\n", receive);
+                                textFromHexString(receive, receberStringASCII);
+
+                                printf("\nValor Descriptografado:\nHEX: [ %s ]\nASCII: [ %s ]\n", receive, receberStringASCII);
                                 printf("Aperte enter para continuar...\n");
                                 getchar();
 
@@ -209,7 +245,9 @@ int main()
                                         return errno;
                                 }
 
-                                printf("\nValor do Hash: [%s]\n", receive);
+                                textFromHexString(receive, receberStringASCII);
+
+                                printf("\nValor do Hash:\nHEX: [ %s ]\nASCII: [ %s ]\n", receive, receberStringASCII);
                                 printf("Aperte enter para continuar...\n");
                                 getchar();
 
@@ -222,8 +260,8 @@ int main()
         {
                 system("clear");
                 printf("OBS: Escreva o que deseja fazer primeiro respresentado pelas letras:\n");
-                printf("(c) para cifrar\n(d) para decifrar\n(h) para calcular o resumo criptografico\n");
-                printf("Depois disso use o espaço e começe a escrever a string em ASCI\n");
+                printf("(c) para cifrar\n(h) para calcular o resumo criptografico\n");
+                printf("Depois disso use o espaço e começe a escrever a string em ASCII\n");
 		__fpurge(stdin);
                 scanf("%[^\n]%*c", stringToSend);                // Read in a string (with spaces)
 
@@ -236,17 +274,18 @@ int main()
                         funcao = funcionalidade(stringToSend);
                 }
 
+                gerarPalavra(stringToSend, enviarString);
+                gerarString(funcao, enviarString, stringToSend2);
+                string2hexString(enviarString, enviarStringHEX);
+
                 switch (funcao)
                 {
                         case 1:
-                                gerarPalavra(stringToSend, enviarString);
-                                string2hexString(enviarString, enviarStringHEX);
-
-                                printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarString, enviarStringHEX);
+                                printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarStringHEX, enviarString);
                                 printf("Aperte enter para criptografar...\n");
                                 getchar();
 
-                                ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
+                                ret = write(fd, stringToSend2, strlen(stringToSend2)); // Send the string to the LKM
   		 
 		                if (ret < 0)
                                 {
@@ -264,20 +303,17 @@ int main()
 
                                 textFromHexString(receive, teste2);
 
-                                printf("\nValor Criptografado:\nHEX: [%s]\nASCII: [%s]", receive, teste2);
+                                printf("\nValor Criptografado:\nHEX: [ %s ]\nASCII: [ %s ]\n", receive, teste2);
                                 printf("Aperte enter para continuar...\n");
                                 getchar();
 
                                 break;
-                        case 2:
-                                gerarPalavra(stringToSend, enviarString);
-                                string2hexString(enviarString, enviarStringHEX);
-
-                                printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarString, enviarStringHEX);
+                        /*case 2:
+                                printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarStringHEX, enviarString);
                                 printf("Aperte enter para criptografar...\n");
                                 getchar();
 
-                                ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
+                                ret = write(fd, stringToSend2, strlen(stringToSend2)); // Send the string to the LKM
   		 
 		                if (ret < 0)
                                 {
@@ -300,16 +336,13 @@ int main()
                                 getchar();
 
 
-                                break;
+                                break;*/
                         case 3:
-                                gerarPalavra(stringToSend, enviarString);
-                                string2hexString(enviarString, enviarStringHEX);
-
-                                printf("\nPalavra a ter o hash caculado:\nHEX: %s\nASCII: %s\n\n",enviarString, enviarStringHEX);
+                                printf("\nPalavra a ter o hash caculado:\nHEX: %s\nASCII: %s\n\n",enviarStringHEX, enviarString);
                                 printf("Aperte enter para calcular hash...\n");
                                 getchar();
 
-                                ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
+                                ret = write(fd, stringToSend2, strlen(stringToSend2)); // Send the string to the LKM
   		 
 		                if (ret < 0)
                                 {
@@ -331,21 +364,6 @@ int main()
 
                                 break;
                 }
-                /*
-                printf("Press ENTER to read back from the device...\n");
-                getchar();
- 
-                printf("Reading from the device...\n");
-                ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
-                if (ret < 0)
-                {
-                        perror("Failed to read the message from the device.");
-                        return errno;
-                }
-
-                printf("The received message is: [%s]\n", receive);
-                printf("Aperte enter para continuar...\n");
-                getchar();*/
         }       
 
    }while(opcao != 3);
