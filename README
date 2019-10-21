@@ -1,1 +1,25 @@
 Projeto de Sistemas Operacionais B.
+
+Instação:
+
+1. Baixe os seguintes arquivos:
+  •modcrypto.c
+  •Makefile
+  •interfaceCrypto.c
+  
+2. Coloque todos os arquivos juntos em uma mesma pasta.
+
+3. Abra o terminal do linux com permissões de administrador na pasta em que os arquivos foram colocados.
+  /* Exemplo da tela do terminal
+     $username@nome-da-maquina:~$sudo su
+     [sudo] password for username: digite a senha
+     root@nome-damaquina:/home/username# cd Caminho/ da/ Pasta/
+  */
+
+4. Execute o comando make.
+  /* Exemplo da tela do terminal
+       root@nome-damaquina:/home/username/Caminho/ da/ Pasta# make
+  */
+  
+5. Espere ele terminar de executar e pronto, agora está executando a interface de comunicação com o dispositivo de criptografia
+   
