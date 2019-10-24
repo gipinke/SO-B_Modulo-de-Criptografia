@@ -151,8 +151,6 @@ static int __init modcrypto_init(void){
 		else key[i] = 0;
 	}
 
-	key[i] = '\0';
-
 	#ifdef DEBUG
 	printk(KERN_INFO "modcrypto: key: %s\n", key);
 	#endif
@@ -212,11 +210,25 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 	char op, data[MAX_MESSAGE_LENGTH] = {0}, converted_data[MAX_MESSAGE_LENGTH] = {0};
 	int len_buff, ret;
 
-	len_buff = strlen(buffer);
+	len_buff = len;
+
+	#ifdef DEBUG
+	pr_info("modcrypto: Received buffer: %s\n", buffer);
+	#endif
 
 	split_operation(buffer, &op, data, len_buff);
+
+	#ifdef DEBUG
+	pr_info("modcrypto: Received data: %s\n", data);
+	#endif
+
 	textFromHexString(data, converted_data);
-	len_buff = strlen(converted_data);
+
+	#ifdef DEBUG
+	pr_info("modcrypto: Converted data: %s\n", converted_data);
+	#endif
+	
+	len_buff = (len - 2)/2;
 
 	switch(op){
 		case 'c': 
@@ -290,7 +302,6 @@ static int modcrypto_encrypt(char *buff, int len_buff)
 		if(i < len_ivdata) _iv[i] = ivdata[i];
 		else _iv[i] = 0;
 	}
-	_iv[i] = '\0';
 
 	#ifdef DEBUG
 	pr_info("modcrypto: Loaded iv: %s\n", _iv);
@@ -421,7 +432,6 @@ static int modcrypto_decrypt(char *buff, int len_buff)
 		if(i < len_ivdata) _iv[i] = ivdata[i];
 		else _iv[i] = 0;
 	}
-	_iv[i] = '\0';
 
 	skcipher = crypto_alloc_skcipher("cbc(aes)", 0, 0);
     if (IS_ERR(skcipher)) {
@@ -531,7 +541,7 @@ static int modcrypto_hash(char *buff, int len)
 	int ret, i;
 
 	hashval = kmalloc(sizeof(unsigned char) * 20, GFP_KERNEL);
-	scratchpad = kmalloc(sizeof(unsigned char) * 20, GFP_KERNEL);
+	scratchpad = kmalloc(sizeof(unsigned char) * 256, GFP_KERNEL);
 
 	for(i = 0; i < len; i++) scratchpad[i] = buff[i];
 	scratchpad[i] = '\0';
