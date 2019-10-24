@@ -21,15 +21,23 @@ Execução:
        root@nome-damaquina:/home/username/Caminho/ da/ Pasta# make
   */
   
-5. Espere ele terminar de executar e pronto, agora está executando a interface de comunicação com o dispositivo de criptografia
-
-6. Caso queira executar novamente execute apenas o comando ./prog
-  /* Exemplo da tela do terminal
+5. Agora execute o comando insmod para inserir o módulo no kernel
+ /* Exemplo da tela do terminal
+       root@nome-damaquina:/home/username/Caminho/ da/ Pasta# insmod modcrypto.ko ivdata="0123456789ABCDEF" keydata="0123456789ABCDEF"
+  */
+  Onde ivdata e keydata são strings de até 16 Bytes.
+  
+ 6. Execute o comando ./prog para iniciar a interface de usuário
+ /* Exemplo da tela do terminal
        root@nome-damaquina:/home/username/Caminho/ da/ Pasta# ./prog
   */
 
-6. Caso queira remover o módulo execute o comando make clean
-  /* Exemplo da tela do terminal
+7. Caso queira remover o módulo execute o comando make clean ou execute um rmmod
+  /* Exemplo da tela do terminal para o comando make clean
        root@nome-damaquina:/home/username/Caminho/ da/ Pasta# make clean
+  */
+  
+  /* Exemplo da tela do terminal para o comando rmmod
+       root@nome-damaquina:/home/username/Caminho/ da/ Pasta# rmmod modcrypto
   */
    
