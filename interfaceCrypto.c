@@ -248,9 +248,7 @@ int main()
                                         return errno;
                                 }
 
-                                textFromHexString(receive, receberStringASCII);
-
-                                printf("\nValor do Hash:\nHEX: [ %s ]\nASCII: [ %s ]\n", receive, receberStringASCII);
+                                printf("\nValor do Hash:\nHEX: [ %s ]\n", receive);
                                 printf("Aperte enter para continuar...\n");
                                 getchar();
 
@@ -263,13 +261,13 @@ int main()
         {
                 system("clear");
                 printf("OBS: Escreva o que deseja fazer primeiro respresentado pelas letras:\n");
-                printf("(c) para cifrar\n(h) para calcular o resumo criptografico\n");
+                printf("(c) para cifrar\n(d) para decifrar\n(h) para calcular o resumo criptografico\n");
                 printf("Depois disso use o espaço e começe a escrever a string em ASCII\n");
 		__fpurge(stdin);
                 scanf("%[^\n]%*c", stringToSend);                // Read in a string (with spaces)
 
                 funcao = funcionalidade(stringToSend);
-                while(funcao == -1 || funcao == 2)
+                while(funcao == -1)
                 {
                         printf("Opcao inexistente! Digite novamente:\n");
  		        __fpurge(stdin);
@@ -312,7 +310,7 @@ int main()
                                 getchar();
 
                                 break;
-                        /*case 2:
+                        case 2:
                                 printf("\nPalavra a ser Criptografada :\nHEX: %s\nASCII: %s\n\n",enviarStringHEX, enviarString);
                                 printf("Aperte enter para criptografar...\n");
                                 getchar();
@@ -335,12 +333,12 @@ int main()
 
                                 textFromHexString(receive, teste2);
 
-                                printf("\nValor Descriptografado:\nHEX: [ %s ]\nASCII: [ %s ]", receive, teste2);
+                                printf("\nValor Descriptografado:\nHEX: [ %s ]\nASCII: [ %s ]\n", receive, teste2);
                                 printf("Aperte enter para continuar...\n");
                                 getchar();
 
 
-                                break;*/
+                                break;
                         case 3:
                                 printf("Palavra a ter o hash calculado:\nHEX: [ %s ]\nASCII: [ %s ]\n\n",enviarStringHEX, enviarString);
                                 printf("Aperte enter para calcular hash...\n");

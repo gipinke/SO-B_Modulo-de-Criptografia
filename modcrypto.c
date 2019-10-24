@@ -180,6 +180,7 @@ static int dev_open(struct inode *inodep, struct file *filep)
 		printk(KERN_ALERT "modcrypto: Device is in use by another process");
 		return -EBUSY;
 	}  
+
 	printk(KERN_INFO "modcrypto: Device successfully opened\n");
 	return 0;
 }
@@ -194,11 +195,13 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	if (error_count==0)
 	{           
 		printk(KERN_INFO "modcrypto: Sent %d characters to the user\n", size_of_message);
-		return (size_of_message=0);
+
+		return size_of_message;
 	}
 	else 
 	{
 		printk(KERN_INFO "modcrypto: Failed to send %d characters to the user\n", error_count);
+
 		return -EFAULT;              
 	}
 }
@@ -208,7 +211,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 {
 	char op, data[MAX_MESSAGE_LENGTH] = {0}, converted_data[MAX_MESSAGE_LENGTH] = {0};
 	int len_buff, ret;
-
 
 	len_buff = strlen(buffer);
 
@@ -244,14 +246,18 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 		break;
 	}
 
+	message[size_of_message] = '\0';
+
 	return len_buff;
 }
 
 
 static int dev_release(struct inode *inodep, struct file *filep)
 {
-   mutex_unlock(&modcrypto_mutex);
+	mutex_unlock(&modcrypto_mutex);
+
    printk(KERN_INFO "modcrypto: Device successfully closed\n");
+   
    return 0;
 }
 
